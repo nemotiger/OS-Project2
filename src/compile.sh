@@ -10,4 +10,4 @@ insmod slave_device.ko
 cd ../user_program
 make
 
-
+chmod 666 /dev/master_device /dev/slave_device
