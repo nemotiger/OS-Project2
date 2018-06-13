@@ -53,7 +53,7 @@ static void __exit slave_exit(void);
 int slave_close(struct inode *inode, struct file *filp);
 int slave_open(struct inode *inode, struct file *filp);
 static long slave_ioctl(struct file *file, unsigned int ioctl_num, unsigned long ioctl_param);
-int receive_msg(struct file *filp, char *buf, size_t count, loff_t *offp );
+ssize_t receive_msg(struct file *filp, char __user *buf, size_t count, loff_t *offp );
 
 static mm_segment_t old_fs;
 static ksocket_t sockfd_cli;//socket to the master server
@@ -113,11 +113,11 @@ static long slave_ioctl(struct file *file, unsigned int ioctl_num, unsigned long
 	long ret = -EINVAL;
 
 	int addr_len ;
-	unsigned int i;
-	size_t len, data_size = 0;
-	char *tmp, ip[20], buf[BUF_SIZE];
-	struct page *p_print;
-	unsigned char *px;
+	//unsigned int i;
+	//size_t len, data_size = 0;
+	char *tmp, ip[20]/*, buf[BUF_SIZE]*/;
+	//struct page *p_print;
+	//unsigned char *px;
 
     pgd_t *pgd;
 	pud_t *pud;
@@ -185,7 +185,7 @@ static long slave_ioctl(struct file *file, unsigned int ioctl_num, unsigned long
 	return ret;
 }
 
-int receive_msg(struct file *filp, char *buf, size_t count, loff_t *offp )
+ssize_t receive_msg(struct file *filp, char __user *buf, size_t count, loff_t *offp )
 {
 //call when user is reading from this device
 	char msg[BUF_SIZE];
