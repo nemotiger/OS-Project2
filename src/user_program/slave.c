@@ -11,6 +11,9 @@
 
 #define PAGE_SIZE 4096
 #define BUF_SIZE 512
+
+#define DEST_FILE_PERMISSION (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)
+
 int main (int argc, char* argv[])
 {
 	char buf[BUF_SIZE];
@@ -35,7 +38,7 @@ int main (int argc, char* argv[])
 		return 1;
 	}
 	gettimeofday(&start ,NULL);
-	if( (file_fd = open (file_name, O_RDWR | O_CREAT | O_TRUNC)) < 0)
+	if( (file_fd = open (file_name, O_RDWR | O_CREAT | O_TRUNC, DEST_FILE_PERMISSION)) < 0)
 	{
 		perror("failed to open input file\n");
 		return 1;
