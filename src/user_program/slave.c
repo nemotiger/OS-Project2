@@ -17,6 +17,8 @@
 int main (int argc, char* argv[])
 {
 	char buf[BUF_SIZE];
+	char mbuf[PAGE_SIZE];
+	char *file_addr, *dev_addr;
 	int i, dev_fd, file_fd;// the fd for the device and the fd for the input file
 	size_t ret, file_size = 0, data_size = -1;
 	char file_name[50];
@@ -50,7 +52,6 @@ int main (int argc, char* argv[])
 		return 1;
 	}
 
-
 	switch(method[0])
 	{
 		case 'f'://fcntl : read()/write()
@@ -61,9 +62,28 @@ int main (int argc, char* argv[])
 				file_size += ret;
 			}while(ret > 0);
 			break;
+		default: // mmap
+			while(1) {
+				data_size = 0;
+				while(data_size < sizeof(mbuf)) {
+					ret = read(dev_fd, mbuf + data_size, sizeof(mbuf) - data_size);
+					data_size += ret;
+					if(ret <= 0) break;
+				}
+				if(data_size == 0) break;
+
+				posix_fallocate(file_fd, file_size, data_size);
+				file_addr = mmap(NULL, data_size, PROT_WRITE, MAP_SHARED, file_fd, file_size);
+				if(file_addr == MAP_FAILED) {
+					perror("file mmap error"); 
+					return 1;
+				}
+
+				memcpy(file_addr, mbuf, data_size);
+				munmap(file_addr, data_size);
+				file_size += data_size;
+			}
 	}
-
-
 
 	if(ioctl(dev_fd, 0x12345679) == -1)// end receiving data, close the connection
 	{

@@ -17,8 +17,9 @@ size_t get_filesize(const char* filename);//get the size of the input file
 int main (int argc, char* argv[])
 {
 	char buf[BUF_SIZE];
+	char *file_addr, *dev_addr;
 	int i, dev_fd, file_fd;// the fd for the device and the fd for the input file
-	size_t ret, file_size, offset = 0, tmp;
+	size_t ret, file_size, offset = 0, count;
 	char file_name[50], method[20];
 	char *kernel_address = NULL, *file_address = NULL;
 	struct timeval start;
@@ -55,7 +56,6 @@ int main (int argc, char* argv[])
 		return 1;
 	}
 
-
 	switch(method[0])
 	{
 		case 'f': //fcntl : read()/write()
@@ -65,6 +65,20 @@ int main (int argc, char* argv[])
 				write(dev_fd, buf, ret);//write to the the device
 			}while(ret > 0);
 			break;
+		default: // mmap
+			file_addr = mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, file_fd, 0);
+			if(file_addr == MAP_FAILED) {
+				perror("file mmap error"); 
+				return 1;
+			}
+			
+			while(offset < file_size) {
+				count = file_size - offset < sizeof(buf) ? file_size - offset : sizeof(buf);
+				memcpy(buf, file_addr + offset, count);
+				write(dev_fd, buf, count);
+				offset += count;
+			}
+			munmap(file_addr, file_size);
 	}
 
 	if(ioctl(dev_fd, 0x12345679) == -1) // end sending data, close the connection
