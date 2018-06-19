@@ -14,6 +14,11 @@
 
 #define DEST_FILE_PERMISSION (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)
 
+struct dev_mmap_arg {
+	size_t count;
+	size_t offset;
+};
+
 int main (int argc, char* argv[])
 {
 	char buf[BUF_SIZE];
@@ -28,7 +33,7 @@ int main (int argc, char* argv[])
 	struct timeval end;
 	double trans_time; //calulate the time between the device is opened and it is closed
 	char *kernel_address, *file_address;
-
+	struct dev_mmap_arg dm_arg;
 
 	strcpy(file_name, argv[1]);
 	strcpy(method, argv[2]);
@@ -63,14 +68,26 @@ int main (int argc, char* argv[])
 			}while(ret > 0);
 			break;
 		default: // mmap
+			dev_addr = mmap(NULL, PAGE_SIZE, PROT_READ, MAP_PRIVATE, dev_fd, 0);
 			while(1) {
 				data_size = 0;
-				while(data_size < sizeof(mbuf)) {
-					ret = read(dev_fd, mbuf + data_size, sizeof(mbuf) - data_size);
+				dm_arg.count = PAGE_SIZE;
+				dm_arg.offset = 0;
+				while(data_size < PAGE_SIZE) {
+					ret = ioctl(dev_fd, 0x12345678, &dm_arg);
+					if(ret == -1) {
+						perror("ioclt slave mmap error");
+						return 1;
+					}
+					if(ret == 0)
+						break;
+
 					data_size += ret;
-					if(ret <= 0) break;
+					dm_arg.count -= ret;
+					dm_arg.offset += ret;
 				}
-				if(data_size == 0) break;
+				if(data_size == 0)
+					break;
 
 				posix_fallocate(file_fd, file_size, data_size);
 				file_addr = mmap(NULL, data_size, PROT_WRITE, MAP_SHARED, file_fd, file_size);
@@ -79,10 +96,11 @@ int main (int argc, char* argv[])
 					return 1;
 				}
 
-				memcpy(file_addr, mbuf, data_size);
+				memcpy(file_addr, dev_addr, data_size);
 				munmap(file_addr, data_size);
 				file_size += data_size;
 			}
+			munmap(dev_addr, PAGE_SIZE);
 	}
 
 	if(ioctl(dev_fd, 0x12345679) == -1)// end receiving data, close the connection
