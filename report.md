@@ -122,9 +122,9 @@ Memory-mapped I/O is faster than file I/O.
 #### Why?
 The number of system calls required for memory-mapped I/O is less than file I/O.
 ### Slave
-Memory-mapped I/O is slightly slower than file I/O for small files but it is significantly slower than file I/O for large files.
+Memory-mapped I/O is slightly slower than file I/O for small files but it is significantly slower than file I/O for large files.
 #### Why?
-Since the file size can not be known beforehand, we can not directly map the entire output file. Instead, we have to allocate file space, map and unmap the file for each write operation. This will pose a lot of overheads compared to a write system call, and the overheads are propotional to the file size.
+Since the file size can not be known beforehand, we can not directly map the entire output file. Instead, we have to allocate file space, map and unmap the file for each write operation. This will pose a lot of overheads compared to a write system call, and the overheads are propotional to the file size.
 
 ## Member contributions
 B05902036 夏瑜： implementation, report  
