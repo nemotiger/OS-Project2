@@ -67,18 +67,27 @@ int main (int argc, char* argv[])
 			break;
 		default: // mmap
 			file_addr = mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, file_fd, 0);
+			dev_addr = mmap(NULL, PAGE_SIZE, PROT_WRITE, MAP_SHARED, dev_fd, 0);
 			if(file_addr == MAP_FAILED) {
 				perror("file mmap error"); 
 				return 1;
 			}
+			if(dev_addr == MAP_FAILED) {
+				perror("device mmap error"); 
+				return 1;
+			}
 			
 			while(offset < file_size) {
-				count = file_size - offset < sizeof(buf) ? file_size - offset : sizeof(buf);
-				memcpy(buf, file_addr + offset, count);
-				write(dev_fd, buf, count);
+				count = file_size - offset < PAGE_SIZE ? file_size - offset : PAGE_SIZE;
+				memcpy(dev_addr, file_addr + offset, count);
+				if(ioctl(dev_fd, 0x12345678, &count) == -1) {
+					perror("ioclt master mmap error");
+					return 1;
+				}
 				offset += count;
 			}
 			munmap(file_addr, file_size);
+			munmap(dev_addr, PAGE_SIZE);
 	}
 
 	if(ioctl(dev_fd, 0x12345679) == -1) // end sending data, close the connection

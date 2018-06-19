@@ -51,12 +51,22 @@ int master_open(struct inode *inode, struct file *filp);
 static long master_ioctl(struct file *file, unsigned int ioctl_num, unsigned long ioctl_param);
 static ssize_t send_msg(struct file *file, const char __user *buf, size_t count, loff_t *data);//use when user is writing to this device
 
+void mmap_open(struct vm_area_struct *vma);
+void mmap_close(struct vm_area_struct *vma);
+static int mmap_fault(struct vm_fault *vmf);
+int op_mmap(struct file *filp, struct vm_area_struct *vma);
+
 static ksocket_t sockfd_srv, sockfd_cli;//socket for master and socket for slave
 static struct sockaddr_in addr_srv;//address for master
 static struct sockaddr_in addr_cli;//address for slave
 static mm_segment_t old_fs;
 static int addr_len;
-//static  struct mmap_info *mmap_msg; // pointer to the mapped data in this device
+
+struct mmap_info {
+    char *data;            
+    int reference;      
+};
+struct mmap_info *mmap_buf; // pointer to the mapped data in this device
 
 //file operations
 static struct file_operations master_fops = {
@@ -64,7 +74,14 @@ static struct file_operations master_fops = {
 	.unlocked_ioctl = master_ioctl,
 	.open = master_open,
 	.write = send_msg,
-	.release = master_close
+	.release = master_close,
+	.mmap = op_mmap,
+};
+
+static struct vm_operations_struct mmap_vm_ops = {
+    .open = mmap_open,
+    .close = mmap_close,
+    .fault = mmap_fault,    
 };
 
 //device info
@@ -137,12 +154,21 @@ static void __exit master_exit(void)
 
 int master_close(struct inode *inode, struct file *filp)
 {
-	return 0;
+	struct mmap_info *info = filp->private_data; 
+    free_page((unsigned long)info->data);
+    kfree(info);
+    filp->private_data = NULL;
+	mmap_buf = NULL;
+    return 0;
 }
 
 int master_open(struct inode *inode, struct file *filp)
 {
-	return 0;
+	struct mmap_info *info = kmalloc(sizeof(struct mmap_info), GFP_KERNEL);    
+    info->data = (char *)get_zeroed_page(GFP_KERNEL);
+    filp->private_data = info; // assign this info struct to the file
+	mmap_buf = info;
+    return 0;
 }
 
 
@@ -175,6 +201,13 @@ static long master_ioctl(struct file *file, unsigned int ioctl_num, unsigned lon
 			ret = 0;
 			break;
 		case master_IOCTL_MMAP:
+			if(copy_from_user(&data_size, (const void *)ioctl_param, sizeof(size_t)) != 0)
+				return -1;
+			if(data_size > PAGE_SIZE)
+				return -1;
+			ksend(sockfd_cli, mmap_buf->data, data_size, 0);
+			printk("Master send %lu bytes of data in mmap buf\n", data_size);
+			ret = 0;
 			break;
 		case master_IOCTL_EXIT:
 			if(kclose(sockfd_cli) == -1)
@@ -209,6 +242,41 @@ static ssize_t send_msg(struct file *file, const char __user *buf, size_t count,
 
 	return count;
 
+}
+
+void mmap_open(struct vm_area_struct *vma)
+{
+    struct mmap_info *info = (struct mmap_info *)vma->vm_private_data;
+    info->reference++;
+}
+ 
+void mmap_close(struct vm_area_struct *vma)
+{
+    struct mmap_info *info = (struct mmap_info *)vma->vm_private_data;
+    info->reference--;
+}
+ 
+static int mmap_fault(struct vm_fault *vmf)
+{
+    struct page *page;
+    struct mmap_info *info;    
+     
+    info = (struct mmap_info *)vmf->vma->vm_private_data;
+    if (info->data) {
+        page = virt_to_page(info->data);      
+    	get_page(page);
+    	vmf->page = page;
+    }
+    return 0;
+}
+ 
+int op_mmap(struct file *filp, struct vm_area_struct *vma)
+{
+    vma->vm_ops = &mmap_vm_ops;
+    vma->vm_flags |= VM_RESERVED;    
+    vma->vm_private_data = filp->private_data;
+    mmap_open(vma);
+    return 0;
 }
 
 
