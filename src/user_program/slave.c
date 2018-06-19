@@ -100,6 +100,7 @@ int main (int argc, char* argv[])
 				munmap(file_addr, data_size);
 				file_size += data_size;
 			}
+			ioctl(dev_fd, 0, dev_addr);
 			munmap(dev_addr, PAGE_SIZE);
 	}
 

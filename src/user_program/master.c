@@ -86,6 +86,7 @@ int main (int argc, char* argv[])
 				}
 				offset += count;
 			}
+			ioctl(dev_fd, 0, dev_addr);
 			munmap(file_addr, file_size);
 			munmap(dev_addr, PAGE_SIZE);
 	}
